@@ -19,9 +19,16 @@ from threading import Thread
 import subprocess
 import json
 
+# Plugin Stuff
+from plugin_loader import Loader
+
 app = Flask(__name__)
 root_directory = ''
 get_request_error = ''
+loader = Loader(
+    plugin_directory=os.path.join(os.getcwd(), 'plugins'),
+    raise_on_error=False
+)
 
 
 @app.route('/', methods=['GET'])
@@ -132,6 +139,13 @@ for handler_file in os.listdir('error_handlers'):
 
     print(f'Adding error handler for: {FC.DARK_CYAN}{error_code}{OPS.RESET}')
     app.errorhandler(error_code)(create_error_handler(redirect_to, return_value, return_code))
+
+print('Loading plugins')
+loader.load_plugins()
+loader.init_plugins()
+loader.load_managers()
+print('Plugins loaded, running on-load')
+loader.call_id('on-load')
 
 if __name__ == '__main__':
     print(f'Loading {FC.LIGHT_GREEN}conf.yml{OPS.RESET}')
