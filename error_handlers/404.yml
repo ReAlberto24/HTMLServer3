@@ -1,0 +1,4 @@
+error-code: 404
+redirect-to: '404.html'
+# return: '<script>window.location.replace("/404.html")</script>'
+return-code: 200
