@@ -1,0 +1,18 @@
+server-default:
+  port: 80
+  wsgi-threads: 4
+  verbose: true
+  # use "/" as separators
+  # variables: $(x)
+  # global variables:
+  #                   cwd - Current Working Directory
+  root-directory: '$(cwd)/html'
+
+# values:
+#   - always
+#   - no-header
+#   - never
+# for the no-header one:
+#   add a header No-Error-Handler
+#   and set its value to "true"
+GET-request-error: 'no-header'
