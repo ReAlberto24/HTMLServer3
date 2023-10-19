@@ -8,7 +8,7 @@ import argparse
 from yaml import safe_load
 from server_classes import Config, Utils
 from server_funcs import (flatten_dict, create_basic_socket_client, create_basic_socket_server,
-                          resolve_directory_path, is_in_directory)
+                          resolve_directory_path, is_in_directory, check_error_code)
 
 # Web Server
 from flask import Flask, send_file, abort, request
@@ -29,6 +29,7 @@ loader = Loader(
     plugin_directory=os.path.join(os.getcwd(), 'plugins'),
     raise_on_error=False
 )
+error_codes_handled = []
 
 
 @app.route('/', methods=['GET'])
@@ -43,6 +44,22 @@ def flask_index() -> (str, int):
 
 @app.route('/<path:file>', methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH'])
 def flask_file(file: str) -> (str, int):
+    # Plugin Implementation
+    if loader.check_endpoint(f'/{file}'):
+        data, _return_code = loader.call_endpoint(f'/{file}',
+                                                  args=request.args if request.method == 'GET' else None,
+                                                  form=request.form if request.method == 'POST' else None,
+                                                  json=request.json if request.method == 'POST' else None)
+        print(f'{FC.DARK_GREEN} {request.method} - /{file} - {_return_code}{OPS.RESET}')
+        if _return_code in error_codes_handled:
+            if request.method == 'GET' and get_request_error == 'always':
+                abort(404)
+            elif request.method == 'GET' and get_request_error == 'no-header':
+                if request.headers.get('No-Error-Handler') is not None:
+                    return '', 404
+                abort(404)
+            return '', 404
+        return str(data), _return_code
     f = resolve_directory_path(os.path.join(root_directory, *file.split('/')))
     if os.path.exists(f) and is_in_directory(root_directory, f):
         if os.path.isdir(f):
@@ -96,24 +113,10 @@ def flask_file(file: str) -> (str, int):
     print(f'{FC.DARK_RED} {request.method} - /{file} - 404{OPS.RESET}')
     return '', 404
 
-
 # @app.errorhandler(404)
 # def flask_error_404(err):
 #     return send_file(os.path.join(root_directory, '404.html')), 200
 
-# Loading error handlers, looks ass but it works great
-#    print('Preloading Error Handlers')
-#    error_handlers = os.listdir('error_handlers')
-#    for handler in error_handlers:
-#        with open(os.path.join(os.getcwd(), 'error_handlers', handler), 'r') as _f_handler:
-#            _d_handler = safe_load(_f_handler)
-#        print(f'Adding error handler for: {_d_handler['error-code']} | ')
-#        app.errorhandler(copy.deepcopy(_d_handler['error-code']))(
-#            lambda err: (send_file(os.path.join(root_directory, copy.deepcopy(_d_handler['redirect-to'])))
-#                         if _d_handler.get('return') is None else
-#                         copy.deepcopy(_d_handler['return']),
-#                         copy.deepcopy(_d_handler['return-code']))
-#        )
 print('Preloading Error Handlers')
 for handler_file in os.listdir('error_handlers'):
     handler_path = os.path.join(os.getcwd(), 'error_handlers', handler_file)
@@ -138,6 +141,8 @@ for handler_file in os.listdir('error_handlers'):
 
 
     print(f'Adding error handler for: {FC.DARK_CYAN}{error_code}{OPS.RESET}')
+    # Plugin Fix
+    error_codes_handled.append(error_code)
     app.errorhandler(error_code)(create_error_handler(redirect_to, return_value, return_code))
 
 print('Loading plugins')

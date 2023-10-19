@@ -49,3 +49,10 @@ def is_in_directory(root, path):
     current_directory = os.path.abspath(os.getcwd())
     target_path = os.path.abspath(path)
     return target_path.startswith(current_directory)
+
+
+def check_error_code(return_code, error_codes_handled, _request, _get_request_error, abort):
+    if return_code in error_codes_handled:
+        if _request.method == 'GET' and _get_request_error in ('always', 'no-header' if not _request.headers.get('No-Error-Handler') else None):
+            return '', 404
+        abort(404)

@@ -175,7 +175,7 @@ class Loader:
             plugin.load_manager()
         self.plugin_loaded = LoaderState.loaded_managers
 
-    def call_id(self, id_):
+    def call_id(self, id_, *args, **kwargs):
         if self.plugin_loaded < LoaderState.loaded_managers:
             if self.roe:
                 raise PluginError('Loader', f'Use .init_plugins() before')
@@ -184,7 +184,33 @@ class Loader:
         for plugin in self.plugins:
             try:
                 with contextlib.redirect_stdout(plugin.stdout_buffer):
-                    plugin.manager.call(id_)
+                    plugin.manager._call_id(id_, *args, **kwargs)
+            except ManagerError as e:
+                # if e._type == 'FunctionNotFound':
+                #     pass
+                continue
+
+    def check_endpoint(self, endpoint) -> bool:
+        if self.plugin_loaded < LoaderState.loaded_managers:
+            if self.roe:
+                raise PluginError('Loader', f'Use .init_plugins() before')
+            print(str(PluginError('Loader', f'Use .init_plugins() before')))
+            return
+        for plugin in self.plugins:
+            if endpoint in plugin.manager.endpoints:
+                return True
+        return False
+
+    def call_endpoint(self, endpoint, *args, **kwargs) -> (str, int):
+        if self.plugin_loaded < LoaderState.loaded_managers:
+            if self.roe:
+                raise PluginError('Loader', f'Use .init_plugins() before')
+            print(str(PluginError('Loader', f'Use .init_plugins() before')))
+            return
+        for plugin in self.plugins:
+            try:
+                with contextlib.redirect_stdout(plugin.stdout_buffer):
+                    return plugin.manager._call_endpoint(endpoint, *args, **kwargs)
             except ManagerError as e:
                 # if e._type == 'FunctionNotFound':
                 #     pass
