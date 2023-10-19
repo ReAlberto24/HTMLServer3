@@ -56,3 +56,8 @@ def check_error_code(return_code, error_codes_handled, _request, _get_request_er
         if _request.method == 'GET' and _get_request_error in ('always', 'no-header' if not _request.headers.get('No-Error-Handler') else None):
             return '', 404
         abort(404)
+
+
+def is_default_type(variable):
+    default_types = (int, float, complex, list, tuple, range, dict, set, frozenset, bool, bytes, bytearray, memoryview, type(None))
+    return any(isinstance(variable, t) for t in default_types)

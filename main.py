@@ -8,7 +8,7 @@ import argparse
 from yaml import safe_load
 from server_classes import Config, Utils
 from server_funcs import (flatten_dict, create_basic_socket_client, create_basic_socket_server,
-                          resolve_directory_path, is_in_directory, check_error_code)
+                          resolve_directory_path, is_in_directory, check_error_code, is_default_type)
 
 # Web Server
 from flask import Flask, send_file, abort, request
@@ -34,32 +34,43 @@ error_codes_handled = []
 
 @app.route('/', methods=['GET'])
 def flask_index() -> (str, int):
+    # Plugin Implementation
+    # - on-request
+    loader.call_id('on-request', request)
     if os.path.exists(os.path.join(root_directory, 'index.html')):
         # File
-        print(f'{FC.LIGHT_RED} {request.method} - / - 200')
+        print(f'{FC.LIGHT_RED} {request.method} - / - 200{OPS.RESET}')
         return send_file(os.path.join(root_directory, 'index.html')), 200
-    print(f'{FC.DARK_RED} {request.method} - / - 404')
+    print(f'{FC.DARK_RED} {request.method} - / - 404{OPS.RESET}')
     abort(404)
 
 
 @app.route('/<path:file>', methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH'])
 def flask_file(file: str) -> (str, int):
     # Plugin Implementation
+    # - on-request
+    loader.call_id('on-request', request)
+    # - custom endpoint
     if loader.check_endpoint(f'/{file}'):
         data, _return_code = loader.call_endpoint(f'/{file}',
                                                   args=request.args if request.method == 'GET' else None,
                                                   form=request.form if request.method == 'POST' else None,
-                                                  json=request.json if request.method == 'POST' else None)
+                                                  json=request.json if request.method == 'POST' else None,
+                                                  headers=request.headers,
+                                                  cookies=request.cookies)
         print(f'{FC.DARK_GREEN} {request.method} - /{file} - {_return_code}{OPS.RESET}')
         if _return_code in error_codes_handled:
             if request.method == 'GET' and get_request_error == 'always':
-                abort(404)
+                abort(_return_code)
             elif request.method == 'GET' and get_request_error == 'no-header':
                 if request.headers.get('No-Error-Handler') is not None:
-                    return '', 404
-                abort(404)
-            return '', 404
-        return str(data), _return_code
+                    return '', _return_code
+                abort(_return_code)
+            return '', _return_code
+        if is_default_type(data):
+            return str(data), _return_code
+        else:
+            return data, _return_code
     f = resolve_directory_path(os.path.join(root_directory, *file.split('/')))
     if os.path.exists(f) and is_in_directory(root_directory, f):
         if os.path.isdir(f):
@@ -89,16 +100,8 @@ def flask_file(file: str) -> (str, int):
                                              stdout=subprocess.PIPE,
                                              stdin=subprocess.DEVNULL,
                                              cwd=os.path.dirname(f))
-                    data = json.loads(process.stdout)
-                    contents, return_code = data[0], data[1]
-                    print(f'{FC.LIGHT_MAGENTA} {request.method} - /{file} - {return_code}{OPS.RESET}')
-                    try:
-                        # Handle error
-                        if data[2]:
-                            abort(return_code)
-                    except IndexError:
-                        pass
-                    return contents, return_code
+                    # Changed Python cgi method, use plugins instead
+                    return process.stdout, 200
         print(f'{FC.LIGHT_RED} {request.method} - /{file} - 200{OPS.RESET}')
         return send_file(f), 200
     if request.method == 'GET' and get_request_error == 'always':
