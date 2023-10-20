@@ -1,10 +1,10 @@
 plugin:
-  name: 'Test'
-  version: 0.1
+  name: 'Default Index Plugin'
+  version: 1
 
   main-file: 'main.py'
 
-  id: 'html_server3.test'
+  id: 'html_server3.default-index'
 
 loader:
   required-version: 1.0

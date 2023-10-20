@@ -5,12 +5,129 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="theme-color" content="#1d2027">
     <title>Hello, World!</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
 </head>
+
+<style>
+    * {
+        font-family: 'Poppins', sans-serif;
+        color: #fdfffd;
+
+        padding: 0;
+        margin: 0;
+    }
+    html, body {
+        width: 100%;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow: auto;
+        scroll-behavior: smooth;
+
+        background: #1d2027;
+        overflow-x: hidden;
+
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    body::-webkit-scrollbar {
+        display: none;
+    }
+
+    div.start {
+        width: 100%;
+        height: 100vh;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+
+        margin-bottom: 30px;
+    }
+
+    span.working {
+        font-size: 50px;
+    }
+
+    span.under-working {
+        font-size: 25px;
+        transition: opacity 2s ease-in-out;
+        opacity: 0.6;
+    }
+
+    span.lower {
+        font-size: 20px;
+    }
+
+    div.under {
+        background: #2d323b;
+        margin: 0;
+    }
+    hr.blend {
+        width: 100%;
+        height: 10px;
+        border: none;
+        background: linear-gradient(to bottom, #1d2027, #2d323b);;
+    }
+</style>
+
 <body>
-    <h1>Hello, World!</h1>
-    <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusantium at enim, exercitationem expedita in,
-        laboriosam, natus nihil provident quam quisquam saepe vitae? Ab error fugit, illo labore recusandae totam
-        vel!</p>
+    <div class="start">
+        <span class="working">The WebServer is Working!</span>
+        <span class="under-working" id="changing-text">&nbsp;</span>
+    </div>
+    <hr class="blend">
+    <div class="start under">
+        <span class="lower">This page is currently using a plugin to change the text on the top</span>
+        <span class="lower">This serves as the standard welcome page employed for assessing the proper functioning of HTMLServer3.</span>
+        <span class="lower">If you can peruse this content, it indicates that HTMLServer3 is functioning as expected.</span>
+        <span class="lower">Please replace this file before proceeding with the operation of your HTTP server.</span>
+    </div>
+    <script>
+        const update_text = () => {
+            const text = document.getElementById('changing-text')
+            const xhr = new XMLHttpRequest()
+            xhr.open('GET', '/index.plugin')
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    // console.log(xhr.responseText)
+                    text.innerHTML = xhr.responseText
+                }
+            }
+            xhr.send()
+        }
+
+        const change_text = () => {
+            const text = document.getElementById('changing-text')
+            if (!element_in_view(text)) {return}
+            text.style.opacity = '0'
+            setTimeout(() => {
+                update_text()
+            }, 2000)
+            setTimeout(() => {
+                text.style.opacity = '0.6'
+            }, 2000)
+        }
+
+        const element_in_view = (element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+            );
+        }
+
+        change_text()
+        setInterval(change_text, 6000)
+    </script>
 </body>
 </html>
