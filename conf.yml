@@ -2,6 +2,7 @@ server-default:
   port: 80
   wsgi-threads: 4
   verbose: true
+  check-public-ip: true
   # use "/" as separators
   # variables: $(x)
   # global variables:

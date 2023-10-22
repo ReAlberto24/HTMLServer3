@@ -7,15 +7,15 @@ import sys
 import argparse
 from yaml import safe_load
 from server_classes import Config, Utils
-from server_funcs import (flatten_dict, create_basic_socket_client, create_basic_socket_server,
-                          resolve_directory_path, is_in_directory, check_error_code, is_default_type)
+from server_funcs import (flatten_dict, resolve_directory_path,
+                          is_in_directory, is_default_type)
+import ip_checker
 
 # Web Server
 from flask import Flask, send_file, abort, request
 import waitress
 import socket
 import http.client
-from threading import Thread
 import subprocess
 import json
 
@@ -52,12 +52,9 @@ def flask_file(file: str) -> (str, int):
     loader.call_id('on-request', request)
     # - custom endpoint
     if loader.check_endpoint(f'/{file}'):
+        # Simplified by just giving the raw request
         data, _return_code = loader.call_endpoint(f'/{file}',
-                                                  args=request.args if request.method == 'GET' else None,
-                                                  form=request.form if request.method == 'POST' else None,
-                                                  json=request.json if request.method == 'POST' else None,
-                                                  headers=request.headers,
-                                                  cookies=request.cookies)
+                                                  request=request)
         print(f'{FC.DARK_GREEN} {request.method} - /{file} - {_return_code}{OPS.RESET}')
         if _return_code in error_codes_handled:
             if request.method == 'GET' and get_request_error == 'always':
@@ -183,11 +180,16 @@ if __name__ == '__main__':
                         default=None,
                         type=int
                         )
-
     parser.add_argument('-v', '--verbose',
                         help=f'Enable detailed informations - Default: {conf['server-default']
                                                                             ['verbose']}',
                         default=conf['server-default']['verbose'],
+                        action='store_true'
+                        )
+    parser.add_argument('--check-public-ip',
+                        help=f'Checks if the server is reachable from the public IP - Default: {conf['server-default']
+                                                                                                  ['check-public-ip']}',
+                        default=conf['server-default']['check-public-ip'],
                         action='store_true'
                         )
 
@@ -195,7 +197,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     full_conf = Config(port=conf['server-default']['port'],
                        threads=conf['server-default']['wsgi-threads'],
-                       verbose=conf['server-default']['verbose'])
+                       verbose=conf['server-default']['verbose'],
+                       check_public_ip=conf['server-default']['check-public-ip'])
 
     print('Finalising configuration')
     if (args.port is not None) and (1 <= args.port):
@@ -206,6 +209,9 @@ if __name__ == '__main__':
 
     if args.verbose is not None:
         full_conf.verbose = args.verbose
+
+    if args.check_public_ip is not None:
+        full_conf.check_public_ip = args.check_public_ip
 
     util = Utils(config=full_conf)
 
@@ -226,20 +232,32 @@ if __name__ == '__main__':
 
     conn = http.client.HTTPSConnection('ipv4.icanhazip.com')
     conn.request('GET', '/')
-    public_add = conn.getresponse().read().decode('utf-8').strip()
+    public_addr = conn.getresponse().read().decode('utf-8').strip()
     del conn
 
-    # # Check for public connections
-    # util.verbose_print('Checking public ip connection')
-    # # Server Thread
-    # threading.Thread(target=create_basic_socket_server, args=(full_conf.port, ), daemon=True).start()
-    # # Client
-    # if create_basic_socket_client(public_add, full_conf.port):
-    #     public_enabled = True
-    # else:
-    #     print(f'{FC.LIGHT_RED}Public address not reachable, '
-    #           f'add firewall rule or enable port forwarding on the router{OPS.RESET}')
-    #     public_enabled = False
+    # Checks for public IP connection
+    public_addr_reachable = False
+    if full_conf.check_public_ip:
+        print('Checking Public IP connection')
+        process = subprocess.run([sys.executable, '-c',
+                                  f'import sys\n'
+                                  f'sys.path.append(r"{os.getcwd()}")\n'
+                                  f'from ip_checker import run\n'
+                                  f'from threading import Thread\n'
+                                  f'from server_funcs import is_server_up\n'
+                                  f'Thread(target=run, args=("0.0.0.0", {full_conf.port}), daemon=True).start()\n'
+                                  f'if is_server_up("http://{public_addr}:{full_conf.port}"):\n'
+                                  f'    exit(0)\n'
+                                  f'exit(1)'],
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.STDOUT,
+                                 stdin=subprocess.DEVNULL)
+
+        if process.returncode == 0:
+            print(f'{FC.LIGHT_GREEN}Public IP is reachable{OPS.RESET}')
+            public_addr_reachable = True
+        else:
+            print(f'{FC.LIGHT_RED}Public IP is not reachable{OPS.RESET}')
 
     # Starts the server
     print('Starting WebServer, use CTRL+C to exit')
@@ -248,10 +266,12 @@ if __name__ == '__main__':
           f'http://127.0.0.1{'' if full_conf.port == 80 else f':{full_conf.port}'}/\n'
           
           f'  {FC.LIGHT_BLUE}Local{OPS.RESET}:   '
-          f'http://{nat_addr}{'' if full_conf.port == 80 else f':{full_conf.port}'}/\n'
-          
-          f'  {FC.LIGHT_BLUE}Public{OPS.RESET}:  '
-          f'http://{public_add}{'' if full_conf.port == 80 else f':{full_conf.port}'}/')
+          f'http://{nat_addr}{'' if full_conf.port == 80 else f':{full_conf.port}'}/')
+
+    if public_addr_reachable:
+        print(f'  {FC.LIGHT_BLUE}Public{OPS.RESET}:  '
+              f'http://{public_addr}{'' if full_conf.port == 80 else f':{full_conf.port}'}/')
+
     waitress.serve(app, host='0.0.0.0', port=full_conf.port, threads=full_conf.threads)
 
     print('Exiting the server')

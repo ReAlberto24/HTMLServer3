@@ -1,4 +1,4 @@
-import socket
+import requests
 import os
 
 
@@ -15,27 +15,15 @@ def flatten_dict(input_dict, parent_key='', separator='.'):
     return flattened_dict
 
 
-def create_basic_socket_server(server_port: int):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_sock:
-        server_sock.bind(('0.0.0.0', server_port))
-        server_sock.listen(5)
-        client_sock, _ = server_sock.accept()
-        client_sock.send(b'ping')
-        if client_sock.recv(1024) == b'pong':
-            client_sock.close()
-            return
-
-
-def create_basic_socket_client(server_addr: str, server_port: int):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_sock:
-            client_sock.connect((server_addr, server_port))
-            if client_sock.recv(1024) == b'ping':
-                client_sock.send(b'pong')
-                client_sock.close()
+def is_server_up(server_url, timeout=3, max_retries=2):
+    for _ in range(max_retries):
+        try:
+            response = requests.get(server_url, timeout=timeout)
+            if response.status_code == 200:
                 return True
-    except Exception:
-        return False
+        except (requests.ConnectionError, requests.Timeout):
+            pass
+    return False
 
 
 def resolve_directory_path(directory_path):

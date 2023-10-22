@@ -123,3 +123,4 @@ pyrightconfig.json
 # error_handlers/*
 python
 favicon.ico
+.gitignore

@@ -173,6 +173,9 @@ class Loader:
             return
         for plugin in self.plugins:
             plugin.load_manager()
+            # Another ID
+            #   if plugin.manager.functions.get('on-manager-load') is not None:
+            #       plugin.manager._call_id('on-manager-load')
         self.plugin_loaded = LoaderState.loaded_managers
 
     def call_id(self, id_, *args, **kwargs):
